@@ -30040,6 +30040,9 @@ function run() {
         const protectedOrganizationName = core.getInput("exempt-organization", {
             required: false,
         });
+        const selectedBranchesRegex = core.getInput("restrict-branches-regex", {
+            required: false,
+        });
         const protectedBranchesRegex = core.getInput("exempt-branches-regex", {
             required: false,
         });
@@ -30068,6 +30071,7 @@ function run() {
             daysBeforeBranchStale,
             daysBeforeBranchDelete,
             staleCommentMessage,
+            selectedBranchesRegex,
             protectedBranchesRegex,
             protectedAuthorsRegex,
             protectedOrganizationName,
@@ -30374,7 +30378,10 @@ function planBranchAction(now, branch, filters, commitComments, params) {
             filters.authorsRegex.test(branch.author.username)) {
             return skip(`author ${branch.author.username} is exempted`);
         }
-        if (filters.branchRegex && filters.branchRegex.test(branch.branchName)) {
+        if (filters.allowedBranchesRegex && !filters.allowedBranchesRegex.test(branch.branchName)) {
+            return skip(`branch ${branch.branchName} is outside of branch selection`);
+        }
+        if (filters.deniedBranchesRegex && filters.deniedBranchesRegex.test(branch.branchName)) {
             return skip(`branch ${branch.branchName} is exempted`);
         }
         if (filters.exemptProtectedBranches && branch.isProtected) {
@@ -30438,14 +30445,18 @@ function removeStaleBranches(octokit, params) {
         const authorsRegex = params.protectedAuthorsRegex
             ? new RegExp(params.protectedAuthorsRegex)
             : null;
-        const branchRegex = params.protectedBranchesRegex
+        const allowedBranchesRegex = params.selectedBranchesRegex
+            ? new RegExp(params.selectedBranchesRegex)
+            : null;
+        const deniedBranchesRegex = params.protectedBranchesRegex
             ? new RegExp(params.protectedBranchesRegex)
             : null;
         const repo = params.repo;
         const filters = {
             staleCutoff,
             authorsRegex,
-            branchRegex,
+            allowedBranchesRegex,
+            deniedBranchesRegex,
             removeCutoff,
             exemptProtectedBranches: params.exemptProtectedBranches,
         };
